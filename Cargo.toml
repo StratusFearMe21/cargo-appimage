@@ -11,6 +11,6 @@ repository = "https://github.com/StratusFearMe21/cargo-appimage"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cargo_toml = "*"
-anyhow = "*"
-platforms = "*"
+cargo_toml = "0.9.0"
+anyhow = "1.0.40"
+platforms = "1.1.0"
