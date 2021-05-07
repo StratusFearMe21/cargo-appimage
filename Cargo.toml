@@ -1,0 +1,16 @@
+[package]
+name = "cargo-appimage"
+version = "0.1.0"
+authors = ["Isaac Mills <rooster0055@protonmail.com>"]
+edition = "2018"
+license = "The GNU General Public License v3.0"
+description = "Converts your crate into an AppImage"
+homepage = "https://github.com/StratusFearMe21/cargo-appimage"
+repository = "https://github.com/StratusFearMe21/cargo-appimage"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cargo_toml = "*"
+anyhow = "*"
+platforms = "*"
