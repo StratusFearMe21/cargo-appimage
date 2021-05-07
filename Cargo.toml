@@ -1,6 +1,6 @@
 [package]
 name = "cargo-appimage"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Isaac Mills <rooster0055@protonmail.com>"]
 edition = "2018"
 license = "GPL-3.0"
