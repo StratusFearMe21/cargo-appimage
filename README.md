@@ -11,7 +11,8 @@ This a cargo program that allows you to convert your Rust programs into AppImage
 
     cargo install cargo-appimage
 
-3.  `cd` inside of the root directory of your crate and run
+3.  `cd` inside of the root directory of your crate and create an icon called **icon.png**
+4.  run this command
 
 <!---->
 
