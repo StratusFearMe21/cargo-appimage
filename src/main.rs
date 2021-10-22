@@ -28,7 +28,7 @@ fn main() -> anyhow::Result<()> {
     std::fs::write(
         "target/cargo-appimage.AppDir/cargo-appimage.desktop",
         format!(
-            "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility",
+            "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;",
             meta.name
         ),
     )
