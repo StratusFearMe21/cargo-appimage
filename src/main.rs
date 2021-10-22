@@ -33,23 +33,23 @@ fn main() -> anyhow::Result<()> {
   std::fs::write(
         "target/cargo-appimage.AppDir/cargo-appimage.desktop",
         format!(
-            "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;",
-            meta.name
+	        "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;",
+	        meta.name
         ),
-    )
-    .unwrap_or(());
-    std::fs::write(
-        "target/cargo-appimage.AppDir/AppRun",
-        "#!/bin/sh\n\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\nEXEC=\"${HERE}/usr/bin/bin\"\nexec \"${EXEC}\"",
-        )
-        .unwrap_or(());
-    Command::new("chmod")
-        .arg("+x")
-        .arg("target/cargo-appimage.AppDir/AppRun")
-        .status()?;
-    Command::new("appimagetool")
-        .arg("target/cargo-appimage.AppDir/")
-        .env("ARCH", platforms::target::TARGET_ARCH.as_str())
-        .status()?;
-    Ok(())
+  )
+		  .unwrap_or(());
+	std::fs::write(
+		"target/cargo-appimage.AppDir/AppRun",
+		"#!/bin/sh\n\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\nEXEC=\"${HERE}/usr/bin/bin\"\nexec \"${EXEC}\"",
+	)
+			.unwrap_or(());
+	Command::new("chmod")
+			.arg("+x")
+			.arg("target/cargo-appimage.AppDir/AppRun")
+			.status()?;
+	Command::new("appimagetool")
+			.arg("target/cargo-appimage.AppDir/")
+			.env("ARCH", platforms::target::TARGET_ARCH.as_str())
+			.status()?;
+	Ok(())
 }
