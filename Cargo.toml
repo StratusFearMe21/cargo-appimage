@@ -1,6 +1,6 @@
 [package]
 name = "cargo-appimage"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Isaac Mills <rooster0055@protonmail.com>", "Jim Hessin <jhessin@gmail.com>"]
 edition = "2018"
 license = "GPL-3.0"
@@ -19,3 +19,8 @@ fs_extra = "1.2.0"
 
 [package.metadata.appimage]
 assets = [".idea"]
+
+[profile.release]
+lto = "fat"
+panic = "abort"
+codegen-units = 1
