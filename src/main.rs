@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     let meta = cargo_toml::Manifest::<Value>::from_path_with_metadata("./Cargo.toml")
         .context("Cannot find Cargo.toml")?
         .package
-        .unwrap();
+        .context("Cannot load metadata from Cargo.toml")?;
 
     let assets = match &meta.metadata.unwrap_or_else(|| Value::Array(vec![])) {
         Value::Table(t) => match t.get("appimage") {
@@ -65,13 +65,11 @@ fn main() -> Result<()> {
             "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;",
             meta.name
         ),
-    )
-    .unwrap_or(());
+    )?;
     std::fs::write(
         "target/cargo-appimage.AppDir/AppRun",
         "#!/bin/sh\n\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\nEXEC=\"${HERE}/usr/bin/bin\"\nexec \"${EXEC}\"",
-        )
-        .unwrap_or(());
+        )?;
     Command::new("chmod")
         .arg("+x")
         .arg("target/cargo-appimage.AppDir/AppRun")
