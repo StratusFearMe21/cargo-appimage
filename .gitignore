@@ -1,5 +1,5 @@
 /target
-/cargo-appimage-x86_64.AppImage
+/cargo-appimage-**-x86_64.AppImage
 /icon.png
 
 # Created by https://www.toptal.com/developers/gitignore/api/intellij
