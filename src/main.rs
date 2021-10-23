@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use cargo_toml::Value;
-use fs_extra::copy_items;
 use fs_extra::dir::CopyOptions;
 use std::process::Command;
 
@@ -12,10 +11,7 @@ fn main() -> Result<()> {
     match std::path::Path::new("./icon.png").exists() {
         true => {}
         false => {
-            Command::new("touch")
-                .arg("icon.png")
-                .status()
-                .context("Failed to generate icon.png")?;
+            std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
         }
     }
 
@@ -42,9 +38,7 @@ fn main() -> Result<()> {
         _ => vec![],
     };
 
-    std::fs::create_dir("target/cargo-appimage.AppDir").unwrap_or(());
-    std::fs::create_dir("target/cargo-appimage.AppDir/usr").unwrap_or(());
-    std::fs::create_dir("target/cargo-appimage.AppDir/usr/bin").unwrap_or(());
+    fs_extra::dir::create_all("target/cargo-appimage.AppDir/usr/bin", false)?;
     std::fs::copy(
         format!("target/release/{}", meta.name),
         "target/cargo-appimage.AppDir/usr/bin/bin",
@@ -52,7 +46,7 @@ fn main() -> Result<()> {
     .context("Cannot find binary file")?;
     std::fs::copy("./icon.png", "target/cargo-appimage.AppDir/icon.png")
         .context("Cannot find icon.png")?;
-    copy_items(
+    fs_extra::copy_items(
         &assets,
         "target/cargo-appimage.AppDir/",
         &CopyOptions {
@@ -73,19 +67,6 @@ fn main() -> Result<()> {
         ),
     )
     .unwrap_or(());
-    std::fs::write(
-        "target/cargo-appimage.AppDir/AppRun",
-        "#!/bin/sh\n\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\nEXEC=\"${HERE}/usr/bin/bin\"\nexec \"${EXEC}\"",
-        )
-        .unwrap_or(());
-    Command::new("chmod")
-        .arg("+x")
-        .arg("target/cargo-appimage.AppDir/AppRun")
-        .status()?;
-    Command::new("appimagetool")
-        .arg("target/cargo-appimage.AppDir/")
-        .env("ARCH", platforms::target::TARGET_ARCH.as_str())
-        .status()?;
     std::fs::write(
         "target/cargo-appimage.AppDir/AppRun",
         "#!/bin/sh\n\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\nEXEC=\"${HERE}/usr/bin/bin\"\nexec \"${EXEC}\"",
