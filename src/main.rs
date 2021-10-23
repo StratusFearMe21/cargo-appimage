@@ -1,18 +1,24 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use cargo_toml::Value;
 use fs_extra::dir::CopyOptions;
-use std::process::Command;
+use std::{io::Write, os::unix::prelude::OpenOptionsExt, process::Command};
+
+const APPDIRPATH: &str = "target/cargo-appimage.AppDir/";
 
 fn main() -> Result<()> {
-    match Command::new("cargo").arg("build").arg("--release").status() {
+    let appdirpath = std::path::Path::new(APPDIRPATH);
+    match Command::new("cargo")
+        .arg("build")
+        .arg("--release")
+        .args(std::env::args().nth(2))
+        .status()
+    {
         Ok(_) => {}
-        Err(_) => panic!("Failed to build package"),
+        Err(_) => bail!("Failed to build package"),
     }
-    match std::path::Path::new("./icon.png").exists() {
-        true => {}
-        false => {
-            std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
-        }
+
+    if !std::path::Path::new("./icon.png").exists() {
+        std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
     }
 
     let meta = cargo_toml::Manifest::<Value>::from_path_with_metadata("./Cargo.toml")
@@ -38,44 +44,38 @@ fn main() -> Result<()> {
         _ => vec![],
     };
 
-    fs_extra::dir::create_all("target/cargo-appimage.AppDir/usr/bin", false)?;
+    fs_extra::dir::create_all(appdirpath.join("usr/bin"), false)?;
     std::fs::copy(
         format!("target/release/{}", meta.name),
-        "target/cargo-appimage.AppDir/usr/bin/bin",
+        appdirpath.join("usr/bin/bin"),
     )
     .context("Cannot find binary file")?;
-    std::fs::copy("./icon.png", "target/cargo-appimage.AppDir/icon.png")
-        .context("Cannot find icon.png")?;
+    std::fs::copy("./icon.png", appdirpath.join("icon.png")).context("Cannot find icon.png")?;
     fs_extra::copy_items(
         &assets,
-        "target/cargo-appimage.AppDir/",
+        appdirpath,
         &CopyOptions {
             overwrite: true,
-            skip_exist: false,
             buffer_size: 0,
             copy_inside: true,
-            content_only: false,
-            depth: 0,
+            ..Default::default()
         },
     )
     .context("Error copying assets")?;
     std::fs::write(
-        "target/cargo-appimage.AppDir/cargo-appimage.desktop",
+        appdirpath.join("cargo-appimage.desktop"),
         format!(
             "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;",
             meta.name
         ),
     )?;
-    std::fs::write(
-        "target/cargo-appimage.AppDir/AppRun",
-        "#!/bin/sh\n\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\nEXEC=\"${HERE}/usr/bin/bin\"\nexec \"${EXEC}\"",
-        )?;
-    Command::new("chmod")
-        .arg("+x")
-        .arg("target/cargo-appimage.AppDir/AppRun")
-        .status()?;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .mode(0o770)
+        .open(appdirpath.join("AppRun"))?.write("#!/bin/sh\n\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\nEXEC=\"${HERE}/usr/bin/bin\"\nexec \"${EXEC}\"".as_bytes())?;
     Command::new("appimagetool")
-        .arg("target/cargo-appimage.AppDir/")
+        .arg(appdirpath)
         .env("ARCH", platforms::target::TARGET_ARCH.as_str())
         .env("VERSION", meta.version)
         .status()?;
