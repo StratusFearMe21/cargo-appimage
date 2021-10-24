@@ -10,7 +10,7 @@ checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
 
 [[package]]
 name = "cargo-appimage"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "cargo_toml",
