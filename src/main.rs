@@ -24,9 +24,15 @@ fn main() -> Result<()> {
         .package
         .context("Cannot load metadata from Cargo.toml")?;
     let assets;
+    let mut args = std::env::args().skip(2);
+    let mut target = args.find(|f| f.contains("--target="));
+    if target.is_some() {
+        target = Some(format!(
+            "{}/release",
+            target.unwrap().split_at(9).1.to_string()
+        ));
+    }
     let link_deps;
-
-    let multibins = meta.bin;
 
     if let Some(meta) = pkg.metadata.as_ref() {
         match meta {
@@ -65,9 +71,10 @@ fn main() -> Result<()> {
         link_deps = false;
     }
 
-    for currentbin in multibins {
+    for currentbin in meta.bin {
         let name = currentbin.name.unwrap_or(pkg.name.clone());
-        let appdirpath = std::path::Path::new("target/").join(&name);
+        let appdirpath = std::path::Path::new("target/").join(name.clone() + ".AppDir");
+        let target = target.clone().unwrap_or("release".to_string());
         fs_extra::dir::create_all(appdirpath.join("usr"), true)
             .with_context(|| format!("Error creating {}", appdirpath.join("usr").display()))?;
 
@@ -88,12 +95,12 @@ fn main() -> Result<()> {
                 .context("Make sure you have awk on your system")?
                 .write_all(
                     &std::process::Command::new("ldd")
-                        .arg(format!("target/release/{}", name))
+                        .arg(format!("target/{}/{}", &target, &name))
                         .output()
                         .with_context(|| {
                             format!(
                                 "Failed to run ldd on {}",
-                                format!("target/release/{}", name)
+                                format!("target/{}/{}", &target, &name)
                             )
                         })?
                         .stdout,
@@ -160,10 +167,10 @@ fn main() -> Result<()> {
         }
 
         std::fs::copy(
-            format!("target/release/{}", name),
+            format!("target/{}/{}", &target, &name),
             appdirpath.join("usr/bin/bin"),
         )
-        .context("Cannot find binary file")?;
+        .with_context(|| format!("Cannot find binary file at target/{}/{}", &target, &name))?;
         std::fs::copy("./icon.png", appdirpath.join("icon.png")).context("Cannot find icon.png")?;
         fs_extra::copy_items(
             &assets,
@@ -179,15 +186,15 @@ fn main() -> Result<()> {
         std::fs::write(
             appdirpath.join("cargo-appimage.desktop"),
             format!(
-            "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;", name 
-        ),
-        )
-        .with_context(|| {
-            format!(
-                "Error writing desktop file {}",
-                appdirpath.join("cargo-appimage.desktop").display()
-            )
-        })?;
+                "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;", name
+                ),
+                )
+            .with_context(|| {
+                format!(
+                    "Error writing desktop file {}",
+                    appdirpath.join("cargo-appimage.desktop").display()
+                    )
+            })?;
         std::fs::copy(
             std::path::PathBuf::from(std::env::var("HOME")?)
                 .join(".cargo/bin/cargo-appimage-runner"),
