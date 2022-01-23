@@ -30,9 +30,23 @@ cargo install cargo-appimage
     auto_link = true
     ```
 
-    2.  AppImages aren't supposed to have EVERY library that your executable links to inside of the AppImage, so delete the libraries that you expect will be on every linux system (libc, libgcc, libpthread, ld-linux, libdl, etc.)
+    2.  AppImages aren't supposed to have EVERY library that your executable links to inside of the AppImage, so either:
 
-    3.  Remove the Cargo.toml option above and run `cargo appimage` again, now only the libs you want should be embedded in the Appimage
+        1. Manually delete the libraries from the libs folder that you expect will be on every linux system (libc, libgcc, libpthread, ld-linux, libdl, etc.), and then remove the `auto_link` option from Cargo.toml and rebuild.  Then only the libraries remaining in the libs folder should be embedded in the Appimage.
+
+        2. Or, use the `auto_link_exclude_list` option to specify a list of glob patterns to exclude.  For example:
+
+        ```toml
+        [package.metadata.appimage]
+        auto_link = true
+        auto_link_exclude_list = [
+            "libc.so*",
+            "libdl.so*",
+            "libpthread.so*",
+        ]
+
+        ```
+        On the next build, only library files not matching the glob patterns will be embedded in the Appimage.
 
 6.  run this command
 

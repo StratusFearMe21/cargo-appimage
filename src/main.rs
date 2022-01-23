@@ -33,6 +33,7 @@ fn main() -> Result<()> {
         ));
     }
     let link_deps;
+    let mut link_exclude_list = Vec::with_capacity(0);
 
     if let Some(meta) = pkg.metadata.as_ref() {
         match meta {
@@ -54,6 +55,15 @@ fn main() -> Result<()> {
                     match t.get("auto_link") {
                         Some(Value::Boolean(v)) => link_deps = v.to_owned(),
                         _ => link_deps = false,
+                    }
+                    if let Some(Value::Array(arr)) = t.get("auto_link_exclude_list") {
+                        for v in arr.iter() {
+                            if let Value::String(s) = v {
+                                link_exclude_list.push(glob::Pattern::new(&s).context(
+                                    "Auto-link exclude list item not a valid glob pattern",
+                                )?);
+                            }
+                        }
                     }
                 }
                 _ => {
@@ -139,6 +149,14 @@ fn main() -> Result<()> {
         if std::path::Path::new("libs").exists() {
             for i in std::fs::read_dir("libs").context("Could not read libs dir")? {
                 let ref path = i?.path();
+
+                // Skip if it matches the exclude list.
+                if let Some(file_name) = path.file_name().map(|p| p.to_str()).flatten() {
+                    if link_exclude_list.iter().any(|p| p.matches(file_name)) {
+                        continue;
+                    }
+                }
+
                 let link = std::fs::read_link(path)
                     .with_context(|| format!("Error reading link in libs {}", path.display()))?;
 
