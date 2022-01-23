@@ -7,12 +7,17 @@ use std::{
 };
 
 fn main() -> Result<()> {
-    Command::new("cargo")
-        .arg("build")
-        .arg("--release")
-        .args(std::env::args().nth(2))
-        .status()
-        .context("Failed to build package")?;
+    // Create and execute cargo build command.
+    let mut command = Command::new("cargo");
+    command.arg("build");
+    if !std::env::args()
+        .skip(2)
+        .any(|arg| arg.starts_with("--profile="))
+    {
+        command.arg("--release");
+    }
+    command.args(std::env::args().skip(2));
+    command.status().context("Failed to build package")?;
 
     if !std::path::Path::new("./icon.png").exists() {
         std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
@@ -24,14 +29,18 @@ fn main() -> Result<()> {
         .package
         .context("Cannot load metadata from Cargo.toml")?;
     let assets;
-    let mut args = std::env::args().skip(2);
-    let mut target = args.find(|f| f.contains("--target="));
-    if target.is_some() {
-        target = Some(format!(
-            "{}/release",
-            target.unwrap().split_at(9).1.to_string()
-        ));
-    }
+    let target = {
+        let profile = std::env::args()
+            .skip(2)
+            .find(|arg| arg.starts_with("--profile="))
+            .map(|arg| arg.split_at(10).1.to_string())
+            .unwrap_or_else(|| "release".into());
+        std::env::args()
+            .skip(2)
+            .find(|arg| arg.starts_with("--target="))
+            .map(|arg| format!("{}/{}", arg.split_at(9).1.to_string(), profile))
+            .unwrap_or_else(|| profile)
+    };
     let link_deps;
     let mut link_exclude_list = Vec::with_capacity(0);
 
@@ -84,7 +93,6 @@ fn main() -> Result<()> {
     for currentbin in meta.bin {
         let name = currentbin.name.unwrap_or(pkg.name.clone());
         let appdirpath = std::path::Path::new("target/").join(name.clone() + ".AppDir");
-        let target = target.clone().unwrap_or("release".to_string());
         fs_extra::dir::create_all(appdirpath.join("usr"), true)
             .with_context(|| format!("Error creating {}", appdirpath.join("usr").display()))?;
 
