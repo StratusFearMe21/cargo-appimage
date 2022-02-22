@@ -19,6 +19,11 @@ fn main() -> Result<()> {
     command.args(std::env::args().skip(2));
     command.status().context("Failed to build package")?;
 
+    let cargo_metadata = cargo_metadata::MetadataCommand::new()
+        .exec()
+        .context("Failed to execute cargo metadata")?;
+    let target_prefix = cargo_metadata.target_directory;
+
     if !std::path::Path::new("./icon.png").exists() {
         std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
     }
@@ -92,7 +97,7 @@ fn main() -> Result<()> {
 
     for currentbin in meta.bin {
         let name = currentbin.name.unwrap_or(pkg.name.clone());
-        let appdirpath = std::path::Path::new("target/").join(name.clone() + ".AppDir");
+        let appdirpath = std::path::Path::new(&target_prefix).join(name.clone() + ".AppDir");
         fs_extra::dir::create_all(appdirpath.join("usr"), true)
             .with_context(|| format!("Error creating {}", appdirpath.join("usr").display()))?;
 
@@ -113,12 +118,12 @@ fn main() -> Result<()> {
                 .context("Make sure you have awk on your system")?
                 .write_all(
                     &std::process::Command::new("ldd")
-                        .arg(format!("target/{}/{}", &target, &name))
+                        .arg(format!("{}/{}/{}", target_prefix, &target, &name))
                         .output()
                         .with_context(|| {
                             format!(
                                 "Failed to run ldd on {}",
-                                format!("target/{}/{}", &target, &name)
+                                format!("{}/{}/{}", target_prefix, &target, &name)
                             )
                         })?
                         .stdout,
@@ -193,10 +198,15 @@ fn main() -> Result<()> {
         }
 
         std::fs::copy(
-            format!("target/{}/{}", &target, &name),
+            format!("{}/{}/{}", target_prefix, &target, &name),
             appdirpath.join("usr/bin/bin"),
         )
-        .with_context(|| format!("Cannot find binary file at target/{}/{}", &target, &name))?;
+        .with_context(|| {
+            format!(
+                "Cannot find binary file at {}/{}/{}",
+                target_prefix, &target, &name
+            )
+        })?;
         std::fs::copy("./icon.png", appdirpath.join("icon.png")).context("Cannot find icon.png")?;
         fs_extra::copy_items(
             &assets,

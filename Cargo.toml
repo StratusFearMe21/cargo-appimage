@@ -21,6 +21,7 @@ platforms = "1.1.0"
 fs_extra = "1.2.0"
 exec = "0.3.1"
 glob = "0.3"
+cargo_metadata = "0.14.2"
 
 [package.metadata.appimage]
 assets = [".idea"]
