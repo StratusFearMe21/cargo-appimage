@@ -59,3 +59,20 @@ cargo install cargo-appimage
     ```shell
     cargo appimage --features=min
     ```
+## Docker
+Apparently this `Dockerfile` works
+```dockerfile
+FROM rust:slim
+
+RUN cargo install cargo-appimage
+# file package is required by appimagetool
+RUN apt-get update && apt-get install -y --no-install-recommends file wget
+
+# Download appimagetool
+RUN wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$(uname -m).AppImage -O /usr/local/bin/appimagetool
+RUN chmod +x /usr/local/bin/appimagetool
+# Path appimagetool magic byte: https://github.com/AppImage/pkg2appimage/issues/373#issuecomment-495754112
+RUN sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
+# Use appimagetool without fuse: https://github.com/AppImage/AppImageKit/wiki/FUSE#docker
+RUN APPIMAGE_EXTRACT_AND_RUN=1 cargo appimage
+```
