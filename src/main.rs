@@ -233,14 +233,16 @@ fn main() -> Result<()> {
             })?;
         std::fs::copy(
             std::path::PathBuf::from(std::env::var("HOME")?)
-                .join(".cargo/bin/cargo-appimage-runner"),
+                .join(std::env::var("CARGO_HOME").unwrap_or_else(|_| ".cargo".to_string()))
+                .join("/bin/cargo-appimage-runner"),
             appdirpath.join("AppRun"),
         )
         .with_context(|| {
             format!(
                 "Error copying {} to {}",
                 std::path::PathBuf::from(std::env::var("HOME").unwrap())
-                    .join(".cargo/bin/cargo-appimage-runner")
+                    .join(std::env::var("CARGO_HOME").unwrap_or_else(|_| ".cargo".to_string()))
+                    .join("bin/cargo-appimage-runner")
                     .display(),
                 appdirpath.join("AppRun").display()
             )
