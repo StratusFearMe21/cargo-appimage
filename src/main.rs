@@ -28,8 +28,10 @@ fn main() -> Result<()> {
         std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
     }
 
-    let meta = cargo_toml::Manifest::<Value>::from_path_with_metadata("./Cargo.toml")
-        .context("Cannot find Cargo.toml")?;
+    let meta = cargo_toml::Manifest::<Value>::from_slice(unsafe {
+        memmap::Mmap::map(&std::fs::File::open("Cargo.toml")?)?.as_ref()
+    })
+    .context("Cannot find Cargo.toml")?;
     let pkg = meta
         .package
         .context("Cannot load metadata from Cargo.toml")?;

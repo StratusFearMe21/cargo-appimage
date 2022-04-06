@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-appimage"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -27,6 +27,7 @@ dependencies = [
  "exec",
  "fs_extra",
  "glob",
+ "memmap",
  "platforms",
 ]
 
@@ -123,6 +124,16 @@ name = "libc"
 version = "0.2.113"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eef78b64d87775463c549fbd80e19249ef436ea3bf1de2a1eb7e717ec7fab1e9"
+
+[[package]]
+name = "memmap"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6585fd95e7bb50d6cc31e20d4cf9afb4e2ba16c5846fc76793f11218da9c475b"
+dependencies = [
+ "libc",
+ "winapi",
+]
 
 [[package]]
 name = "platforms"
