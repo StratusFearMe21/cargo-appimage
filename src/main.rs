@@ -236,7 +236,7 @@ fn main() -> Result<()> {
         std::fs::copy(
             std::path::PathBuf::from(std::env::var("HOME")?)
                 .join(std::env::var("CARGO_HOME").unwrap_or_else(|_| ".cargo".to_string()))
-                .join("/bin/cargo-appimage-runner"),
+                .join("bin/cargo-appimage-runner"),
             appdirpath.join("AppRun"),
         )
         .with_context(|| {
