@@ -50,6 +50,7 @@ fn main() -> Result<()> {
     };
     let link_deps;
     let mut link_exclude_list = Vec::with_capacity(0);
+    let mut args = vec![];
 
     if let Some(meta) = pkg.metadata.as_ref() {
         match meta {
@@ -71,6 +72,19 @@ fn main() -> Result<()> {
                     match t.get("auto_link") {
                         Some(Value::Boolean(v)) => link_deps = v.to_owned(),
                         _ => link_deps = false,
+                    }
+                    match t.get("args") {
+                        Some(Value::Array(v)) => {
+                            args = v
+                                .to_vec()
+                                .into_iter()
+                                .filter_map(|v| match v {
+                                    Value::String(s) => Some(s),
+                                    _ => None,
+                                })
+                                .collect()
+                        }
+                        _ => {}
                     }
                     if let Some(Value::Array(arr)) = t.get("auto_link_exclude_list") {
                         for v in arr.iter() {
@@ -250,8 +264,11 @@ fn main() -> Result<()> {
             )
         })?;
 
+        let mut bin_args = args.to_vec();
+        bin_args.push(appdirpath.into_os_string().into_string().unwrap());
+
         Command::new("appimagetool")
-            .arg(appdirpath)
+            .args(bin_args)
             .env("ARCH", platforms::target::TARGET_ARCH.as_str())
             .env("VERSION", pkg.version.as_str())
             .status()
