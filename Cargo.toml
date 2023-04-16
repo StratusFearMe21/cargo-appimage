@@ -1,6 +1,6 @@
 [package]
 name = "cargo-appimage"
-version = "1.4.2"
+version = "1.4.3"
 authors = [
 	"Isaac Mills <rooster0055@protonmail.com>",
 	"Jim Hessin <jhessin@gmail.com>",
