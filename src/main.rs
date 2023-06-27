@@ -1,8 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use cargo_toml::Value;
 use fs_extra::dir::CopyOptions;
 use std::{
     io::{Read, Write},
+    path::Path,
     process::{Command, Stdio},
 };
 
@@ -26,6 +27,13 @@ fn main() -> Result<()> {
 
     if !std::path::Path::new("./icon.png").exists() {
         std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
+    }
+
+    while !Path::new("Cargo.toml").exists() {
+        if std::env::current_dir().unwrap() == Path::new("/") {
+            bail!("No Cargo.toml found in any parent dirs");
+        }
+        std::env::set_current_dir("..").context("Cannot chdir into previous directory")?;
     }
 
     let meta = cargo_toml::Manifest::<Value>::from_slice(unsafe {
@@ -215,7 +223,7 @@ fn main() -> Result<()> {
 
         std::fs::copy(
             format!("{}/{}/{}", target_prefix, &target, &name),
-            appdirpath.join("usr/bin/bin"),
+            appdirpath.join(format!("usr/bin/{}", &name)),
         )
         .with_context(|| {
             format!(
@@ -238,8 +246,8 @@ fn main() -> Result<()> {
         std::fs::write(
             appdirpath.join("cargo-appimage.desktop"),
             format!(
-                "[Desktop Entry]\nName={}\nExec=bin\nIcon=icon\nType=Application\nCategories=Utility;", name
-                ),
+                "[Desktop Entry]\nName={}\nExec={}\nIcon=icon\nType=Application\nCategories=Utility;", name
+                , name),
                 )
             .with_context(|| {
                 format!(
@@ -267,8 +275,11 @@ fn main() -> Result<()> {
         let mut bin_args = args.to_vec();
         bin_args.push(appdirpath.into_os_string().into_string().unwrap());
 
+        let _ =
+            std::fs::create_dir_all("target/appimage").context("Unable to create output dir")?;
         Command::new("appimagetool")
             .args(bin_args)
+            .arg(&format!("target/appimage/{}.AppImage", &name))
             .env("ARCH", platforms::target::TARGET_ARCH.as_str())
             .env("VERSION", pkg.version.as_str())
             .status()

@@ -5,6 +5,9 @@ fn main() -> anyhow::Result<()> {
     let parent = here_dir
         .parent()
         .with_context(|| format!("{} has no parent directory", &here_dir.display()))?;
+    let parent = parent
+        .parent()
+        .with_context(|| format!("{} has no parent directory", &parent.display()))?;
     std::env::set_current_dir(&parent)?;
     std::env::set_var(
         "LD_LIBRARY_PATH",
@@ -18,6 +21,7 @@ fn main() -> anyhow::Result<()> {
             std::env::var("XDG_DATA_DIRS").unwrap_or(String::new())
         ),
     );
+
     let err = exec::execvp(parent.join("usr/bin/bin"), std::env::args());
     eprintln!("Error: {}", err);
     Ok(())
