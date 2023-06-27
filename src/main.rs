@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use cargo_toml::Value;
+use cargo_toml::{Product, Value};
 use fs_extra::dir::CopyOptions;
 use std::{
     io::{Read, Write},
@@ -36,10 +36,12 @@ fn main() -> Result<()> {
         std::env::set_current_dir("..").context("Cannot chdir into previous directory")?;
     }
 
-    let meta = cargo_toml::Manifest::<Value>::from_slice(unsafe {
+    let mut meta = cargo_toml::Manifest::<Value>::from_slice(unsafe {
         memmap::Mmap::map(&std::fs::File::open("Cargo.toml")?)?.as_ref()
     })
     .context("Cannot find Cargo.toml")?;
+    meta.complete_from_path(Path::new("."))
+        .context("Could not fill in the gaps in Cargo.toml")?;
     let pkg = meta
         .package
         .context("Cannot load metadata from Cargo.toml")?;
@@ -119,6 +121,7 @@ fn main() -> Result<()> {
         link_deps = false;
     }
 
+    if meta.bin.is_empty() {}
     for currentbin in meta.bin {
         let name = currentbin.name.unwrap_or(pkg.name.clone());
         let appdirpath = std::path::Path::new(&target_prefix).join(name.clone() + ".AppDir");
