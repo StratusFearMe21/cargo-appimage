@@ -11,6 +11,19 @@ fn main() -> anyhow::Result<()> {
         format!("{}/usr/lib/:{}/usr/lib/i386-linux-gnu/:{}/usr/lib/x86_64-linux-gnu/:{}/usr/lib32/:{}/usr/lib64/:{}/lib/:{}/lib/i386-linux-gnu/:{}/lib/x86_64-linux-gnu/:{}/lib32/:{}/lib64/{}", parent.display(), parent.display(), parent.display(), parent.display(), parent.display(), parent.display(), parent.display(), parent.display(), parent.display(), parent.display(), if let Ok(ldlibpath) = std::env::var("LD_LIBRARY_PATH") { ":".to_string() + &ldlibpath } else { String::new() }),
     );
     std::env::set_var(
+        "PATH",
+        format!(
+            "{}/usr/bin:{}/bin{}",
+            parent.display(),
+            parent.display(),
+            if let Ok(path) = std::env::var("PATH") {
+                ":".to_string() + &path
+            } else {
+                String::new()
+            }
+        ),
+    );
+    std::env::set_var(
         "XDG_DATA_DIRS",
         format!(
             "XDG_DATA_DIRS={}:{}",
@@ -23,12 +36,3 @@ fn main() -> anyhow::Result<()> {
     eprintln!("Error: {}", err);
     Ok(())
 }
-
-// .env(
-//            "LD_LIBRARY_PATH",
-//            if let Ok(env) = std::env::var("LD_LIBRARY_PATH") {
-//                args.map(|i| i + ":").collect::<String>() + &env
-//            } else {
-//                args.map(|i| i + ":").collect::<String>()
-//            },
-//        )
