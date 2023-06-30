@@ -278,11 +278,11 @@ fn main() -> Result<()> {
         let mut bin_args = args.to_vec();
         bin_args.push(appdirpath.into_os_string().into_string().unwrap());
 
-        let _ =
-            std::fs::create_dir_all("target/appimage").context("Unable to create output dir")?;
+        let _ = std::fs::create_dir_all(format!("{}/appimage", &target_prefix))
+            .context("Unable to create output dir")?;
         Command::new("appimagetool")
             .args(bin_args)
-            .arg(&format!("target/appimage/{}.AppImage", &name))
+            .arg(&format!("{}/appimage/{}.AppImage", &target_prefix, &name))
             .env("ARCH", platforms::target::TARGET_ARCH.as_str())
             .env("VERSION", pkg.version.as_str())
             .status()
