@@ -1,4 +1,5 @@
 use anyhow::Context;
+use std::fs;
 
 fn main() -> anyhow::Result<()> {
     let here_dir = std::path::PathBuf::from(std::env::current_exe()?);
@@ -32,7 +33,23 @@ fn main() -> anyhow::Result<()> {
         ),
     );
 
-    let err = exec::execvp(parent.join("usr/bin/bin"), std::env::args());
+    let Some(executable) = fs::read_dir(parent.join("usr/bin/"))?.next() else {
+        eprintln!("Error: Executable file not found");
+        return Ok(());
+    };
+
+    let file_name = executable?.file_name();
+
+    let Some(executable_name) = file_name.to_str() else {
+        eprintln!("Error: Failed to get executable name");
+        return Ok(());
+    };
+
+    let err = exec::execvp(
+        parent.join(format!("usr/bin/{executable_name}")),
+        std::env::args(),
+    );
     eprintln!("Error: {}", err);
+
     Ok(())
 }
