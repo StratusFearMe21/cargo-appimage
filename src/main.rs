@@ -226,7 +226,7 @@ fn main() -> Result<()> {
 
         std::fs::copy(
             format!("{}/{}/{}", target_prefix, &target, &name),
-            appdirpath.join("usr/bin/bin"),
+            appdirpath.join(format!("usr/bin/{}", &name)),
         )
         .with_context(|| {
             format!(
