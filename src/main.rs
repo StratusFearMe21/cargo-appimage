@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use cargo_toml::{Product, Value};
+use cargo_toml::Value;
 use fs_extra::dir::CopyOptions;
 use std::{
     io::{Read, Write},
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
         memmap::Mmap::map(&std::fs::File::open("Cargo.toml")?)?.as_ref()
     })
     .context("Cannot find Cargo.toml")?;
-    meta.complete_from_path(Path::new("."))
+    meta.complete_from_path_and_workspace::<cargo_toml::Value>(Path::new("."), None)
         .context("Could not fill in the gaps in Cargo.toml")?;
     let pkg = meta
         .package
@@ -284,7 +284,7 @@ fn main() -> Result<()> {
             .args(bin_args)
             .arg(&format!("{}/appimage/{}.AppImage", &target_prefix, &name))
             .env("ARCH", platforms::target::TARGET_ARCH.as_str())
-            .env("VERSION", pkg.version.as_str())
+            .env("VERSION", pkg.version())
             .status()
             .context("Error occurred: make sure that appimagetool is installed")?;
     }
