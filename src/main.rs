@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     let target_prefix = cargo_metadata.target_directory;
 
     if !std::path::Path::new("./icon.png").exists() {
-        std::fs::write("./icon.png", &[]).context("Failed to generate icon.png")?;
+        std::fs::write("./icon.png", []).context("Failed to generate icon.png")?;
     }
 
     while !Path::new("Cargo.toml").exists() {
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
         std::env::args()
             .skip(2)
             .find(|arg| arg.starts_with("--target="))
-            .map(|arg| format!("{}/{}", arg.split_at(9).1.to_string(), profile))
+            .map(|arg| format!("{}/{}", arg.split_at(9).1, profile))
             .unwrap_or_else(|| profile)
     };
     let link_deps;
@@ -69,8 +69,7 @@ fn main() -> Result<()> {
                     match t.get("assets") {
                         Some(Value::Array(v)) => {
                             assets = v
-                                .to_vec()
-                                .into_iter()
+                                .iter()
                                 .filter_map(|v| match v {
                                     Value::String(s) => Some(s),
                                     _ => None,
@@ -83,23 +82,19 @@ fn main() -> Result<()> {
                         Some(Value::Boolean(v)) => link_deps = v.to_owned(),
                         _ => link_deps = false,
                     }
-                    match t.get("args") {
-                        Some(Value::Array(v)) => {
-                            args = v
-                                .to_vec()
-                                .into_iter()
-                                .filter_map(|v| match v {
-                                    Value::String(s) => Some(s),
-                                    _ => None,
-                                })
-                                .collect()
-                        }
-                        _ => {}
+                    if let Some(Value::Array(v)) = t.get("args") {
+                        args = v
+                            .iter()
+                            .filter_map(|v| match v {
+                                Value::String(s) => Some(s),
+                                _ => None,
+                            })
+                            .collect()
                     }
                     if let Some(Value::Array(arr)) = t.get("auto_link_exclude_list") {
                         for v in arr.iter() {
                             if let Value::String(s) = v {
-                                link_exclude_list.push(glob::Pattern::new(&s).context(
+                                link_exclude_list.push(glob::Pattern::new(s).context(
                                     "Auto-link exclude list item not a valid glob pattern",
                                 )?);
                             }
@@ -121,7 +116,6 @@ fn main() -> Result<()> {
         link_deps = false;
     }
 
-    if meta.bin.is_empty() {}
     for currentbin in meta.bin {
         let name = currentbin.name.unwrap_or(pkg.name.clone());
         let appdirpath = std::path::Path::new(&target_prefix).join(name.clone() + ".AppDir");
@@ -149,8 +143,8 @@ fn main() -> Result<()> {
                         .output()
                         .with_context(|| {
                             format!(
-                                "Failed to run ldd on {}",
-                                format!("{}/{}/{}", target_prefix, &target, &name)
+                                "Failed to run ldd on {}/{}/{}",
+                                target_prefix, &target, &name
                             )
                         })?
                         .stdout,
@@ -164,34 +158,33 @@ fn main() -> Result<()> {
             fs_extra::dir::create("libs", true).context("Failed to create libs dir")?;
 
             for line in linkedlibs.lines() {
-                if line.starts_with("/") {
-                    if !std::path::Path::new("libs").join(&line[1..]).exists() {
-                        std::os::unix::fs::symlink(
+                if line.starts_with('/') && !std::path::Path::new("libs").join(&line[1..]).exists()
+                {
+                    std::os::unix::fs::symlink(
+                        line,
+                        std::path::Path::new("libs").join(
+                            std::path::Path::new(line)
+                                .file_name()
+                                .with_context(|| format!("No filename for {}", line))?,
+                        ),
+                    )
+                    .with_context(|| {
+                        format!(
+                            "Error symlinking {} to {}",
                             line,
-                            std::path::Path::new("libs").join(
-                                std::path::Path::new(line)
-                                    .file_name()
-                                    .with_context(|| format!("No filename for {}", line))?,
-                            ),
+                            std::path::Path::new("libs").join(&line[1..]).display()
                         )
-                        .with_context(|| {
-                            format!(
-                                "Error symlinking {} to {}",
-                                line,
-                                std::path::Path::new("libs").join(&line[1..]).display()
-                            )
-                        })?;
-                    }
+                    })?;
                 }
             }
         }
 
         if std::path::Path::new("libs").exists() {
             for i in std::fs::read_dir("libs").context("Could not read libs dir")? {
-                let ref path = i?.path();
+                let path = &i?.path();
 
                 // Skip if it matches the exclude list.
-                if let Some(file_name) = path.file_name().map(|p| p.to_str()).flatten() {
+                if let Some(file_name) = path.file_name().and_then(|p| p.to_str()) {
                     if link_exclude_list.iter().any(|p| p.matches(file_name)) {
                         continue;
                     }
@@ -200,7 +193,7 @@ fn main() -> Result<()> {
                 let link = std::fs::read_link(path)
                     .with_context(|| format!("Error reading link in libs {}", path.display()))?;
 
-                if fs_extra::dir::create_all(
+                fs_extra::dir::create_all(
                     appdirpath.join(
                         &link
                             .parent()
@@ -210,9 +203,7 @@ fn main() -> Result<()> {
                             [1..],
                     ),
                     false,
-                )
-                .is_err()
-                {}
+                )?;
                 let dest = appdirpath.join(
                     &link
                         .to_str()
@@ -276,9 +267,10 @@ fn main() -> Result<()> {
         })?;
 
         let mut bin_args = args.to_vec();
-        bin_args.push(appdirpath.into_os_string().into_string().unwrap());
+        let appdirpath = appdirpath.into_os_string().into_string().unwrap();
+        bin_args.push(&appdirpath);
 
-        let _ = std::fs::create_dir_all(format!("{}/appimage", &target_prefix))
+        std::fs::create_dir_all(format!("{}/appimage", &target_prefix))
             .context("Unable to create output dir")?;
         Command::new("appimagetool")
             .args(bin_args)
