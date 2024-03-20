@@ -56,7 +56,7 @@ fn main() -> Result<()> {
     let mut link_exclude_list: Vec<glob::Pattern> = Vec::with_capacity(0);
     let mut args: Vec<&String> = vec![];
     let mut icon_path: Option<String> = None;
-    let mut startup_wm_class: Option<String> = Some("cargo-appimage".to_string());
+    let mut startup_wm_class: Option<String> = None;
     let mut desktop_file: Option<String> = Some("cargo-appimage.desktop".to_string());
 
     if let Some(meta) = pkg.metadata.as_ref() {
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
                     }
                     match t.get("startup_wm_class") {
                         Some(Value::String(v)) => startup_wm_class = Some(v.to_owned()),
-                        _ => startup_wm_class = Some("cargo-appimage".to_string()),
+                        _ => startup_wm_class = None,
                     }
                     match t.get("desktop_file") {
                         Some(Value::String(v)) => desktop_file = Some(v.to_owned()),
@@ -268,16 +268,27 @@ fn main() -> Result<()> {
             icon = "icon.png".to_string();
             std::fs::write(appdirpath.join(icon.as_str()), []).context(format!("Failed to generate {}", icon))?;
         }
-        
+
+        // Optionally include StartupWMClass
+        let startup_wm_class_text = if startup_wm_class.as_ref().is_some() {
+            format!("StartupWMClass={}\n", startup_wm_class.as_ref().unwrap())
+        } else {
+            "".to_owned()
+        };
+
         let file_stem = std::path::Path::new(&icon).file_stem().unwrap();
+        let desktop_file_contents = format!("\
+                                                    [Desktop Entry]\n\
+                                                    Name={}\n\
+                                                    Exec={}\n\
+                                                    Icon={}\n\
+                                                    Type=Application\n\
+                                                    Categories=Utility;\n\
+                                                    {}",
+            name, name, file_stem.to_str().unwrap(), startup_wm_class_text);
+
         std::fs::write(
-            appdirpath.join(desktop_file.as_ref().unwrap()),
-            format!(
-                "[Desktop Entry]\nName={}\nExec={}\nIcon={}\nType=Application\nCategories=Utility;\nStartupWMClass={}", name,
-                name,
-                file_stem.to_str().unwrap(),
-                startup_wm_class.as_ref().unwrap()
-            )).with_context(|| {
+            appdirpath.join(desktop_file.as_ref().unwrap()), desktop_file_contents).with_context(|| {
                 format!(
                     "Error writing desktop file {}",
                     appdirpath.join(desktop_file.as_ref().unwrap()).display()
