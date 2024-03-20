@@ -2,9 +2,7 @@ use anyhow::{bail, Context, Result};
 use cargo_toml::Value;
 use fs_extra::dir::CopyOptions;
 use std::{
-    io::{Read, Write},
-    path::Path,
-    process::{Command, Stdio},
+    fs, io::{Read, Write}, path::Path, process::{Command, Stdio}
 };
 
 fn main() -> Result<()> {
@@ -24,10 +22,6 @@ fn main() -> Result<()> {
         .exec()
         .context("Failed to execute cargo metadata")?;
     let target_prefix = cargo_metadata.target_directory;
-
-    if !std::path::Path::new("./icon.png").exists() {
-        std::fs::write("./icon.png", []).context("Failed to generate icon.png")?;
-    }
 
     while !Path::new("Cargo.toml").exists() {
         if std::env::current_dir().unwrap() == Path::new("/") {
@@ -59,8 +53,11 @@ fn main() -> Result<()> {
             .unwrap_or_else(|| profile)
     };
     let link_deps;
-    let mut link_exclude_list = Vec::with_capacity(0);
-    let mut args = vec![];
+    let mut link_exclude_list: Vec<glob::Pattern> = Vec::with_capacity(0);
+    let mut args: Vec<&String> = vec![];
+    let mut icon_path: Option<String> = None;
+    let mut startup_wm_class: Option<String> = Some("cargo-appimage".to_string());
+    let mut desktop_file: Option<String> = Some("cargo-appimage.desktop".to_string());
 
     if let Some(meta) = pkg.metadata.as_ref() {
         match meta {
@@ -81,6 +78,18 @@ fn main() -> Result<()> {
                     match t.get("auto_link") {
                         Some(Value::Boolean(v)) => link_deps = v.to_owned(),
                         _ => link_deps = false,
+                    }
+                    match t.get("icon") {
+                        Some(Value::String(v)) => icon_path = Some(v.to_owned()),
+                        _ => icon_path = None,
+                    }
+                    match t.get("startup_wm_class") {
+                        Some(Value::String(v)) => startup_wm_class = Some(v.to_owned()),
+                        _ => startup_wm_class = Some("cargo-appimage".to_string()),
+                    }
+                    match t.get("desktop_file") {
+                        Some(Value::String(v)) => desktop_file = Some(v.to_owned()),
+                        _ => desktop_file = Some("cargo-appimage.desktop".to_string()),
                     }
                     if let Some(Value::Array(v)) = t.get("args") {
                         args = v
@@ -119,11 +128,16 @@ fn main() -> Result<()> {
     for currentbin in meta.bin {
         let name = currentbin.name.unwrap_or(pkg.name.clone());
         let appdirpath = std::path::Path::new(&target_prefix).join(name.clone() + ".AppDir");
+
+        // For clearing old cache
+        let _ = fs::remove_dir_all(appdirpath.clone());
+
         fs_extra::dir::create_all(appdirpath.join("usr"), true)
             .with_context(|| format!("Error creating {}", appdirpath.join("usr").display()))?;
 
         fs_extra::dir::create_all(appdirpath.join("usr/bin"), true)
             .with_context(|| format!("Error creating {}", appdirpath.join("usr/bin").display()))?;
+
         if link_deps {
             if !std::path::Path::new("libs").exists() {
                 std::fs::create_dir("libs").context("Could not create libs directory")?;
@@ -225,7 +239,7 @@ fn main() -> Result<()> {
                 target_prefix, &target, &name
             )
         })?;
-        std::fs::copy("./icon.png", appdirpath.join("icon.png")).context("Cannot find icon.png")?;
+
         fs_extra::copy_items(
             &assets,
             appdirpath.as_path(),
@@ -237,18 +251,40 @@ fn main() -> Result<()> {
             },
         )
         .context("Error copying assets")?;
+
+        let icon: String;
+        if icon_path.clone().is_some() {
+            icon = icon_path.clone().unwrap();
+            let filename = std::path::Path::new(&icon).file_name().unwrap();
+            if std::path::Path::new(&icon_path.as_ref().unwrap()).exists() {
+                // Copy if icon exists
+                std::fs::copy(&icon, appdirpath.join(filename.to_os_string().into_string().unwrap())).context(format!("Cannot find {}", icon))?;
+            } else {
+                // Create blank file if icon doesn't exist
+                std::fs::write(appdirpath.join(filename.to_str().unwrap()), []).context(format!("Failed to generate {}", icon))?;
+            }
+        } else {
+            // Create blank file if icon doesn't exist
+            icon = "icon.png".to_string();
+            std::fs::write(appdirpath.join(icon.as_str()), []).context(format!("Failed to generate {}", icon))?;
+        }
+        
+        let file_stem = std::path::Path::new(&icon).file_stem().unwrap();
         std::fs::write(
-            appdirpath.join("cargo-appimage.desktop"),
+            appdirpath.join(desktop_file.as_ref().unwrap()),
             format!(
-                "[Desktop Entry]\nName={}\nExec={}\nIcon=icon\nType=Application\nCategories=Utility;", name
-                , name),
-                )
-            .with_context(|| {
+                "[Desktop Entry]\nName={}\nExec={}\nIcon={}\nType=Application\nCategories=Utility;\nStartupWMClass={}", name,
+                name,
+                file_stem.to_str().unwrap(),
+                startup_wm_class.as_ref().unwrap()
+            )).with_context(|| {
                 format!(
                     "Error writing desktop file {}",
-                    appdirpath.join("cargo-appimage.desktop").display()
-                    )
-            })?;
+                    appdirpath.join(desktop_file.as_ref().unwrap()).display()
+                )
+            }
+        )?;
+
         std::fs::copy(
             std::path::PathBuf::from(std::env::var("HOME")?)
                 .join(std::env::var("CARGO_HOME").unwrap_or_else(|_| ".cargo".to_string()))
