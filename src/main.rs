@@ -3,14 +3,13 @@ use cargo_toml::Value;
 use fs_extra::dir::CopyOptions;
 use std::{
     io::{Read, Write},
-    path::Path,
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
-// TODO use clap for arg mannament instead of raw handle - 20/3/2025
+// TODO use clap for arg management instead of raw handle - 20/3/2025
 fn main() -> Result<()> {
     // Create and execute cargo build command.
-    let mut command = Command::new("cargo");
+    let mut command = std::process::Command::new("cargo");
     command.arg("build");
     if !std::env::args()
         .skip(2)
@@ -26,12 +25,8 @@ fn main() -> Result<()> {
         .context("Failed to execute cargo metadata")?;
     let target_prefix = cargo_metadata.target_directory;
 
-    if !std::path::Path::new("./icon.png").exists() {
-        std::fs::write("./icon.png", []).context("Failed to generate icon.png")?;
-    }
-
-    while !Path::new("Cargo.toml").exists() {
-        if std::env::current_dir().unwrap() == Path::new("/") {
+    while !std::path::Path::new("Cargo.toml").exists() {
+        if std::env::current_dir()? == std::path::Path::new("/") {
             bail!("No Cargo.toml found in any parent dirs");
         }
         std::env::set_current_dir("..").context("Cannot chdir into previous directory")?;
@@ -42,13 +37,19 @@ fn main() -> Result<()> {
     let mut meta = cargo_toml::Manifest::<Value>::from_slice(mmap.as_ref())
         .context("Failed to parse Cargo.toml")?;
 
-    meta.complete_from_path_and_workspace::<cargo_toml::Value>(Path::new("./Cargo.toml"), None)
-        .context("Could not fill in the gaps in Cargo.toml")?;
+    meta.complete_from_path_and_workspace::<cargo_toml::Value>(
+        std::path::Path::new("./Cargo.toml"),
+        None,
+    )
+    .context("Could not fill in the gaps in Cargo.toml")?;
 
     let pkg = meta
         .package
         .context("Cannot load metadata from Cargo.toml")?;
     let assets;
+    let mut icon_path = "./icon.png";
+    let mut desktop_entry_path = "./cargo-appimage.desktop";
+
     let target = {
         let profile = std::env::args()
             .skip(2)
@@ -80,6 +81,18 @@ fn main() -> Result<()> {
                                 .collect()
                         }
                         _ => assets = Vec::with_capacity(0),
+                    }
+                    match t.get("icon") {
+                        Some(Value::String(s)) => {
+                            icon_path = s;
+                        }
+                        _ => {},
+                    }
+                    match t.get("desktop_entry") {
+                        Some(Value::String(s)) => {
+                            desktop_entry_path = s;
+                        }
+                        _ => {},
                     }
                     match t.get("auto_link") {
                         Some(Value::Boolean(v)) => link_deps = v.to_owned(),
@@ -119,8 +132,9 @@ fn main() -> Result<()> {
         link_deps = false;
     }
 
-    for currentbin in meta.bin {
-        let name = currentbin.name.unwrap_or(pkg.name.clone());
+    // Prepare the AppDir directory structure
+    for current_product in meta.bin {
+        let name = current_product.name.unwrap_or(pkg.name.clone());
         let appdirpath = std::path::Path::new(&target_prefix).join(name.clone() + ".AppDir");
         fs_extra::dir::create_all(appdirpath.join("usr"), true)
             .with_context(|| format!("Error creating {}", appdirpath.join("usr").display()))?;
@@ -218,6 +232,7 @@ fn main() -> Result<()> {
             }
         }
 
+        // Copy app executable
         std::fs::copy(
             format!("{}/{}/{}", target_prefix, &target, &name),
             appdirpath.join(format!("usr/bin/{}", &name)),
@@ -228,7 +243,47 @@ fn main() -> Result<()> {
                 target_prefix, &target, &name
             )
         })?;
-        std::fs::copy("./icon.png", appdirpath.join("icon.png")).context("Cannot find icon.png")?;
+
+        // Copy icon
+        {
+            let icon_path_object = std::path::Path::new(icon_path);
+            if !icon_path_object.exists() {
+                println!(
+                    "[CARGO APPIMAGE] {icon_path} does not exist. No icon will be used for your AppImage."
+                );
+            } else {
+                // Assuming all image files have an extension
+                let extension = icon_path_object
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .context("No icon extension found")?;
+
+                let destination = appdirpath.join(format!("{name}.{extension}"));
+                std::fs::copy(icon_path_object, destination)
+                    .context(format!("Cannot copy {icon_path}"))?;
+            }
+        }
+
+        // Copy desktop entry
+        if !std::path::Path::new(desktop_entry_path).exists() {
+            std::fs::write(
+                appdirpath.join("cargo-appimage.desktop"),
+                format!(
+                    "[Desktop Entry]\nName={}\nExec={}\nIcon={}\nType=Application\nCategories=Utility;", name
+                    , name, name),
+            )
+                .with_context(|| {
+                    format!(
+                        "Error writing desktop file {}",
+                        appdirpath.join("cargo-appimage.desktop").display()
+                    )
+                })?;
+        } else {
+            std::fs::copy(desktop_entry_path, appdirpath.join("cargo-appimage.desktop"))
+                .context(format!("Cannot find {desktop_entry_path}"))?;
+        }
+
+        // Copy assets
         fs_extra::copy_items(
             &assets,
             appdirpath.as_path(),
@@ -240,18 +295,8 @@ fn main() -> Result<()> {
             },
         )
         .context("Error copying assets")?;
-        std::fs::write(
-            appdirpath.join("cargo-appimage.desktop"),
-            format!(
-                "[Desktop Entry]\nName={}\nExec={}\nIcon=icon\nType=Application\nCategories=Utility;", name
-                , name),
-                )
-            .with_context(|| {
-                format!(
-                    "Error writing desktop file {}",
-                    appdirpath.join("cargo-appimage.desktop").display()
-                    )
-            })?;
+
+        // Copy runner
         std::fs::copy(
             std::path::PathBuf::from(std::env::var("HOME")?)
                 .join(std::env::var("CARGO_HOME").unwrap_or_else(|_| ".cargo".to_string()))
@@ -269,13 +314,14 @@ fn main() -> Result<()> {
             )
         })?;
 
+        // Launch appimagetool
         let mut bin_args = args.to_vec();
         let appdirpath = appdirpath.into_os_string().into_string().unwrap();
         bin_args.push(&appdirpath);
 
         std::fs::create_dir_all(format!("{}/appimage", &target_prefix))
             .context("Unable to create output dir")?;
-        Command::new("appimagetool")
+        std::process::Command::new("appimagetool")
             .args(bin_args)
             .arg(format!("{}/appimage/{}.AppImage", &target_prefix, &name))
             .env("ARCH", std::env::consts::ARCH)

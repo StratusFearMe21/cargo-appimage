@@ -11,14 +11,16 @@ This a cargo program that allows you to convert your Rust programs into AppImage
 cargo install cargo-appimage
 ```
 
-3.  `cd` inside of the root directory of your crate and create an icon called **icon.png**
-    1.  Note this can simply be an empty file for development. In fact an empty file is generated if you forget to make one.
+3.  (optional) By default, any file named `icon.png` at the root of yor repository will be used as icon.
+    Create a file with this name or customize your desktop entry using the configuration keys described in 4.
 
 4.  (optional) create a section in your Cargo.toml similar to the following
     with any additional assets to add to the AppImg:
     ```toml
     [package.metadata.appimage]
     assets = ["images", "sounds"]
+    icon = "assets/icon.png"
+    desktop_entry = "other/myapp.desktop"
     ```
 
 5.  (optional) If you are using external crates that use other programs or are not written in pure rust, you may want to check if you need to embed some shared libraries into your AppImage:
