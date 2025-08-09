@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use cargo_toml::Value;
 use fs_extra::dir::CopyOptions;
 use std::{
@@ -7,6 +7,7 @@ use std::{
     process::{Command, Stdio},
 };
 
+// TODO use clap for arg mannament instead of raw handle - 20/3/2025
 fn main() -> Result<()> {
     // Create and execute cargo build command.
     let mut command = Command::new("cargo");
@@ -36,12 +37,14 @@ fn main() -> Result<()> {
         std::env::set_current_dir("..").context("Cannot chdir into previous directory")?;
     }
 
-    let mut meta = cargo_toml::Manifest::<Value>::from_slice(unsafe {
-        memmap::Mmap::map(&std::fs::File::open("Cargo.toml")?)?.as_ref()
-    })
-    .context("Cannot find Cargo.toml")?;
-    meta.complete_from_path_and_workspace::<cargo_toml::Value>(Path::new("."), None)
+    let file = std::fs::File::open("Cargo.toml").context("Failed to open Cargo.toml")?;
+    let mmap = unsafe { memmap::Mmap::map(&file)? };
+    let mut meta = cargo_toml::Manifest::<Value>::from_slice(mmap.as_ref())
+        .context("Failed to parse Cargo.toml")?;
+
+    meta.complete_from_path_and_workspace::<cargo_toml::Value>(Path::new("./Cargo.toml"), None)
         .context("Could not fill in the gaps in Cargo.toml")?;
+
     let pkg = meta
         .package
         .context("Cannot load metadata from Cargo.toml")?;
@@ -274,8 +277,8 @@ fn main() -> Result<()> {
             .context("Unable to create output dir")?;
         Command::new("appimagetool")
             .args(bin_args)
-            .arg(&format!("{}/appimage/{}.AppImage", &target_prefix, &name))
-            .env("ARCH", platforms::target::TARGET_ARCH.as_str())
+            .arg(format!("{}/appimage/{}.AppImage", &target_prefix, &name))
+            .env("ARCH", std::env::consts::ARCH)
             .env("VERSION", pkg.version())
             .status()
             .context("Error occurred: make sure that appimagetool is installed")?;
